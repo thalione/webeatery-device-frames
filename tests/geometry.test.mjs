@@ -41,3 +41,33 @@ test('browser: urlPill sits inside the chrome bar (above screenRegion)', () => {
   assert.ok(g.urlPill.y + g.urlPill.height <= g.screenRegion.y);
   assert.ok(g.urlPill.x + g.urlPill.width <= g.frameSize.width);
 });
+
+test('phone: island bounds sit inside the screen region and are horizontally centred', () => {
+  const i = geometry.phone.island;
+  assert.ok(i, 'phone.island missing');
+  assert.ok(i.topPct > 0 && i.topPct + i.heightPct < 15, 'island should sit near the top of the screen');
+  const centre = i.leftPct + i.widthPct / 2;
+  assert.ok(Math.abs(centre - 50) < 0.5, `island should be centred, got ${centre}`);
+});
+
+test('phone: island clears the status-bar side gutters at the render viewport', () => {
+  const { island, renderViewport } = geometry.phone;
+  const left = (island.leftPct / 100) * renderViewport.width;
+  const right = ((island.leftPct + island.widthPct) / 100) * renderViewport.width;
+  // The simulated status bar puts its content in the outer gutters; keep at
+  // least 100px of clear space each side at the 390px render width.
+  assert.ok(left > 100, `left gutter too narrow: ${left}`);
+  assert.ok(renderViewport.width - right > 100, `right gutter too narrow: ${renderViewport.width - right}`);
+});
+
+test('cover-scale fills the screen slot for both devices (no bare-frame sliver)', () => {
+  for (const [name, g] of Object.entries(geometry)) {
+    const scale = 0.3; // arbitrary frame-art px → CSS px
+    const slotW = g.screenRegion.width * scale, slotH = g.screenRegion.height * scale;
+    const cover = Math.max(slotW / g.renderViewport.width, slotH / g.renderViewport.height);
+    assert.ok(g.renderViewport.width * cover >= slotW - 0.01, `${name}: width short of slot`);
+    assert.ok(g.renderViewport.height * cover >= slotH - 0.01, `${name}: height short of slot`);
+    const overflow = Math.max(g.renderViewport.width * cover - slotW, g.renderViewport.height * cover - slotH);
+    assert.ok(overflow < slotW * 0.01, `${name}: cover crop ${overflow}px exceeds 1% of slot`);
+  }
+});

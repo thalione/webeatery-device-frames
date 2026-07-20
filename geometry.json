@@ -1,19 +1,52 @@
 {
   "phone": {
     "frameFile": "iphone-17-pro-max.png",
-    "frameSize": { "width": 900, "height": 1840 },
-    "screenRegion": { "x": 48, "y": 46, "width": 804, "height": 1748 },
+    "frameSize": {
+      "width": 900,
+      "height": 1840
+    },
+    "screenRegion": {
+      "x": 48,
+      "y": 46,
+      "width": 804,
+      "height": 1748
+    },
     "cornerRadius": 45,
     "safeAreaTop": 59,
-    "renderViewport": { "width": 390, "height": 844 }
+    "renderViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "island": {
+      "topPct": 1.659,
+      "heightPct": 4.062,
+      "leftPct": 34.577,
+      "widthPct": 30.846
+    }
   },
   "browser": {
     "frameFile": "browser-chrome.png",
-    "frameSize": { "width": 2600, "height": 1780 },
-    "screenRegion": { "x": 20, "y": 160, "width": 2560, "height": 1600 },
+    "frameSize": {
+      "width": 2600,
+      "height": 1780
+    },
+    "screenRegion": {
+      "x": 20,
+      "y": 160,
+      "width": 2560,
+      "height": 1600
+    },
     "cornerRadius": 12,
     "safeAreaTop": 0,
-    "urlPill": { "x": 300, "y": 40, "width": 900, "height": 80 },
-    "renderViewport": { "width": 1280, "height": 800 }
+    "urlPill": {
+      "x": 300,
+      "y": 40,
+      "width": 900,
+      "height": 80
+    },
+    "renderViewport": {
+      "width": 1280,
+      "height": 800
+    }
   }
 }

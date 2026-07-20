@@ -45,8 +45,10 @@ export function DevicePreview({
 }: {
   device: DeviceKind
   urlText?: string
-  /** browser only: render children in a literal renderViewport-sized box,
-   * scaled to fit — an embedded app then sees innerWidth = 1280. */
+  /** Render children in a literal renderViewport-sized box (390×844 phone,
+   * 1280×800 browser) scaled to fill the screen slot — an embedded app then
+   * lays out at real-device width instead of whatever the slot happens to be,
+   * so breakpoints and text truncation match a real device. */
   fixedViewport?: boolean
   children: ReactNode
   className?: string
@@ -58,7 +60,13 @@ export function DevicePreview({
   useEffect(() => {
     const el = wrapRef.current
     if (!el) return
-    const measure = () => setWrapWidth(el.getBoundingClientRect().width)
+    // offsetWidth, NOT getBoundingClientRect(): the latter reports the
+    // POST-transform size, so an ancestor mid-animation (e.g. a crossfade
+    // holding the inactive view at scale(.98)) yields a too-small reading —
+    // and ResizeObserver never re-fires when that transform settles, because
+    // the layout size never changed. The stale scale then sticks forever and
+    // the app renders short of the bezel.
+    const measure = () => setWrapWidth(el.offsetWidth)
     measure()
     const ro = new ResizeObserver(measure)
     ro.observe(el)
@@ -68,6 +76,7 @@ export function DevicePreview({
   const scale = wrapWidth / g.frameSize.width // frame-art px → CSS px
   const rect = screenRectPct(device)
   const slotWidthPx = g.screenRegion.width * scale
+  const slotHeightPx = g.screenRegion.height * scale
 
   const slotStyle: CSSProperties = {
     position: 'absolute',
@@ -81,14 +90,22 @@ export function DevicePreview({
   }
 
   const viewport = g.renderViewport
+  // Cover, not contain: the phone's screen region and its 390×844 viewport
+  // differ by ~0.5% in aspect, and a contain-fit would leave a visible sliver
+  // of bare frame at the bottom. Centring the overflow splits the (sub-pixel
+  // to ~1px) crop evenly instead of taking it all off one edge.
+  const coverScale = Math.max(slotWidthPx / viewport.width, slotHeightPx / viewport.height)
   const inner: ReactNode =
-    fixedViewport && device === 'browser' ? (
+    fixedViewport ? (
       <div
         style={{
+          position: 'absolute',
+          left: '50%',
+          top: '50%',
           width: viewport.width,
           height: viewport.height,
-          transform: `scale(${slotWidthPx / viewport.width})`,
-          transformOrigin: 'top left',
+          transform: `translate(-50%, -50%) scale(${coverScale})`,
+          transformOrigin: 'center',
         }}
       >
         {children}
