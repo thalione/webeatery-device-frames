@@ -30,7 +30,7 @@ logoUrl?: string   // data:image/(png|jpeg|webp);base64,… only; string length 
 `customize/protocol.js` (+ matching `protocol.d.ts`) adds:
 - `isValidBrightness(v)`, `isValidStyle(v)` — exact-string checks.
 - `isValidLogoUrl(v)` — regex `^data:image/(png|jpeg|webp);base64,` AND `v.length <= 1_500_000`. No http(s) URLs in v1.
-- `buildCustomizeMessage` includes each field only when valid; message is null when NO field is valid (unchanged rule).
+- `buildCustomizeMessage` includes each field only when valid. **The null-return condition must check all five optional fields** (`appName || primaryColor || themeBrightness || themeStyle || logoUrl`) — the current v0.2.2 condition checks only the first two, and a theme-only or logo-only message would otherwise be silently discarded.
 
 Full-state emit stays: every panel change re-sends all valid fields, so resend-on-ready and fallback-upgrade deliver the complete customization.
 
@@ -45,13 +45,16 @@ Selections feed the same debounced full-state emit. `CustomizePanel` props gain 
 ## 3. Showcase apply (`template_restaurant_react`)
 
 ### Unpin (showcase-only)
-- New module state beside the customize listener (`apps/web/src/showcase/customize.ts`): `getShowcaseThemeMode(): ThemeMode` defaulting `'colorfullight'`; the listener updates it.
-- `ThemeContext.tsx` init effect: when `document.documentElement.dataset.showcase === '1'`, skip the hardcoded `setGlobalThemeMode('colorfullight')` and initialize from `getShowcaseThemeMode()` instead. Non-showcase (real tenants): the force stays byte-identical. The TODO comment is updated to note the showcase carve-out.
+- New module state in `apps/web/src/showcase/customize.ts`: `getShowcaseThemeMode(): ThemeMode` (default `'colorfullight'`) and `setShowcaseThemeMode(mode: ThemeMode): void`; the listener's theme-apply path calls the setter before requesting remount. `ThemeMode` lowercase strings verified against `packages/core/src/design-tokens/theme-modes.ts:13` (`'mutedlight' | 'colorfullight' | 'muteddark' | 'colorfuldark'`).
+- `ThemeContext.tsx` init effect: when `document.documentElement.dataset.showcase === '1'` (stamped at module-eval by `showcase.ts:96-97` before React renders — no ordering hazard), skip the hardcoded `setGlobalThemeMode('colorfullight')` and call `setGlobalThemeMode(getShowcaseThemeMode())` instead. Non-showcase (real tenants): the force stays byte-identical. The TODO comment is updated to note the showcase carve-out.
+- Brand-CSS-vars note: `ThemeContext.updateTheme()` and round-1's `injectBrandTokens()` both write the **same** `#brand-tokens` element from the same `generateCSSVariables()` source (`ThemeContext.tsx:96-102`) — two idempotent writers of one element, no divergence; no refactor needed.
 
 ### Listener
-- `themeBrightness`/`themeStyle` validated (exact strings) → merged with the currently-stored axes → one of `colorfullight | colorfuldark | mutedlight | muteddark` → stored via the module state → **remount** (the round-1 remount callback), deduped: identical resulting mode does not remount. Remount re-runs ThemeProvider init → reads showcase mode → `updateTheme()` regenerates theme + brand CSS vars.
-- `logoUrl` validated (same rule as protocol) → `setRestaurant({ ...currentRestaurant, logoUrl })`. Store subscription re-renders `DesktopLayout`; **no remount**. Mobile layout untouched.
-- **Apply order within one message:** name → logo → theme mode → primary color, then a **single remount at the end** if (and only if) theme mode or primary color actually changed. The round-1 per-color remount call moves into this consolidated tail.
+- The round-1 local `CustomizeMessage` type and `isCustomizeMessage` shape guard are extended: the three new fields, when present, must be strings (guard rejects wrong types, ignores absent fields). Round-1's guard already ignores unknown extra fields, so skew is safe in both directions.
+- **Theme apply + dedupe (precise):** listener keeps `lastAppliedMode: ThemeMode` (init `'colorfullight'`) beside round-1's `lastAppliedHex`, plus current axes (`brightness`, `style`, init `light`/`colorful`). Incoming valid `themeBrightness`/`themeStyle` overwrite their axis; candidate mode = `${style}${brightness}` mapping to the 4 lowercase modes. If candidate ≠ `lastAppliedMode`: `setShowcaseThemeMode(candidate)` → mark theme-dirty → update `lastAppliedMode` on successful apply. Identical candidate → no-op (no remount).
+- `logoUrl` validated (same rule as protocol) → `setRestaurant({ ...currentRestaurant, logoUrl })`. Store subscription re-renders `DesktopLayout`; **no remount, never marks dirty**. Mobile layout untouched.
+- **Apply order within one message:** name → logo → theme mode → primary color, then a **single remount at the end** iff theme-dirty OR color-dirty (round-1's per-color remount call moves into this consolidated tail; `lastAppliedHex` dedupe semantics unchanged — a failed apply still must not advance either last-applied marker).
+- Remount re-runs ThemeProvider init → reads showcase mode → `updateTheme()` regenerates theme + brand CSS vars.
 - All apply paths keep swallowing their own errors (lead-facing invariant).
 
 ### Fields interplay
