@@ -172,13 +172,16 @@ export function CustomizePanel({
           data-testid="customize-color"
         />
       </div>
-      {/* Theme | Style | App icon share one row; the two segmented groups
-          get equal flex so all four buttons end up the same size. */}
+      {/* Theme above Style in a left column; App icon on the right. The
+          stacked groups share one column width, and each button is flex:1,
+          so all four Theme/Style buttons render the same size. */}
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: 16, marginTop: 12 }}>
-        <SegmentedGroup label="Theme" options={['light', 'dark'] as const} value={brightness}
-          onSelect={(v) => { setBrightness(v as 'light' | 'dark'); emit(name, color, v, style) }} />
-        <SegmentedGroup label="Style" options={['colorful', 'muted'] as const} value={style}
-          onSelect={(v) => { setStyle(v as 'colorful' | 'muted'); emit(name, color, brightness, v) }} />
+        <div style={{ flex: 1, minWidth: 150, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <SegmentedGroup label="Theme" options={['light', 'dark'] as const} value={brightness}
+            onSelect={(v) => { setBrightness(v as 'light' | 'dark'); emit(name, color, v, style) }} />
+          <SegmentedGroup label="Style" options={['colorful', 'muted'] as const} value={style}
+            onSelect={(v) => { setStyle(v as 'colorful' | 'muted'); emit(name, color, brightness, v) }} />
+        </div>
         {appIconSlot != null && (
           <div style={{ flexShrink: 0 }}>
             <FieldLabel>App icon</FieldLabel>
@@ -211,7 +214,7 @@ function SegmentedGroup({
   onSelect: (v: string) => void
 }) {
   return (
-    <div style={{ flex: 1, minWidth: 150 }}>
+    <div>
       <FieldLabel>{label}</FieldLabel>
       <div role="radiogroup" aria-label={label} style={{ display: 'flex', gap: 8 }}>
         {options.map((opt) => (
