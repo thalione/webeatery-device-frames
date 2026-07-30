@@ -15,15 +15,22 @@ import {
   isValidHex,
   normalizeAppName,
   sendCustomize,
+  isValidBrightness,
+  isValidStyle,
+  isValidLogoUrl,
+  LOGO_MAX_LENGTH,
 } from './protocol.js'
 
 export type CustomizeMessage = {
   webeateryCustomize: typeof CUSTOMIZE_VERSION
   appName?: string
   primaryColor?: string
+  themeBrightness?: 'light' | 'dark'
+  themeStyle?: 'colorful' | 'muted'
+  logoUrl?: string
 }
 
-export { CUSTOMIZE_VERSION, SWATCHES, buildCustomizeMessage, isValidHex, normalizeAppName, sendCustomize }
+export { CUSTOMIZE_VERSION, SWATCHES, buildCustomizeMessage, isValidHex, normalizeAppName, sendCustomize, isValidBrightness, isValidStyle, isValidLogoUrl, LOGO_MAX_LENGTH }
 
 const DEBOUNCE_MS = 150
 
@@ -48,25 +55,36 @@ const PANEL_CSS = `
 export function CustomizePanel({
   initialName,
   initialColor,
+  initialBrightness,
+  initialStyle,
   onChange,
   className,
 }: {
   initialName?: string
   initialColor?: string
+  initialBrightness?: 'light' | 'dark'
+  initialStyle?: 'colorful' | 'muted'
   onChange: (msg: CustomizeMessage) => void
   className?: string
 }) {
   const [name, setName] = useState(initialName ?? '')
   const [color, setColor] = useState(initialColor ?? SWATCHES[0])
+  const [brightness, setBrightness] = useState(initialBrightness ?? 'light')
+  const [style, setStyle] = useState(initialStyle ?? 'colorful')
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current) }, [])
 
-  // Full-state emit: every change re-sends name AND color so a consumer can
-  // treat the latest message as the whole customization state.
-  const emit = (nextName: string, nextColor: string) => {
+  // Full-state emit: every change re-sends name, color, brightness, and style
+  // so a consumer can treat the latest message as the whole customization state.
+  const emit = (nextName: string, nextColor: string, nextBrightness: string, nextStyle: string) => {
     if (timer.current) clearTimeout(timer.current)
     timer.current = setTimeout(() => {
-      const msg = buildCustomizeMessage({ appName: nextName, primaryColor: nextColor })
+      const msg = buildCustomizeMessage({
+        appName: nextName,
+        primaryColor: nextColor,
+        themeBrightness: nextBrightness,
+        themeStyle: nextStyle,
+      })
       if (msg) onChange(msg as CustomizeMessage)
     }, DEBOUNCE_MS)
   }
@@ -83,7 +101,7 @@ export function CustomizePanel({
           value={name}
           maxLength={40}
           placeholder="Your restaurant's name"
-          onChange={(e) => { setName(e.target.value); emit(e.target.value, color) }}
+          onChange={(e) => { setName(e.target.value); emit(e.target.value, color, brightness, style) }}
           data-testid="customize-name"
           className="wdf-name"
           style={{
@@ -122,7 +140,7 @@ export function CustomizePanel({
               alignItems: 'center',
               justifyContent: 'center',
             }}
-            onClick={() => { setColor(hex); emit(name, hex) }}
+            onClick={() => { setColor(hex); emit(name, hex, brightness, style) }}
           >
             <span
               aria-hidden
@@ -143,10 +161,56 @@ export function CustomizePanel({
           value={isValidHex(color) ? color : '#FF0000'}
           aria-label="Custom color"
           className="wdf-colorwell"
-          onChange={(e) => { setColor(e.target.value); emit(name, e.target.value) }}
+          onChange={(e) => { setColor(e.target.value); emit(name, e.target.value, brightness, style) }}
           data-testid="customize-color"
         />
       </div>
+      <SegmentedRow label="Theme" options={['light', 'dark'] as const} value={brightness}
+        onSelect={(v) => { setBrightness(v as 'light' | 'dark'); emit(name, color, v, style) }} />
+      <SegmentedRow label="Style" options={['colorful', 'muted'] as const} value={style}
+        onSelect={(v) => { setStyle(v as 'colorful' | 'muted'); emit(name, color, brightness, v) }} />
+    </div>
+  )
+}
+
+function SegmentedRow({
+  label,
+  options,
+  value,
+  onSelect,
+}: {
+  label: string
+  options: readonly [string, string]
+  value: string
+  onSelect: (v: string) => void
+}) {
+  return (
+    <div role="radiogroup" aria-label={label} style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
+      <span style={{ fontSize: '0.8em', fontWeight: 500, opacity: 0.7, minWidth: 64 }}>{label}</span>
+      {options.map((opt) => (
+        <button
+          key={opt}
+          type="button"
+          role="radio"
+          aria-checked={value === opt}
+          className="wdf-swatch"
+          onClick={() => onSelect(opt)}
+          style={{
+            minHeight: 40,
+            padding: '6px 14px',
+            borderRadius: 999,
+            border: '1px solid rgba(0,0,0,0.15)',
+            background: value === opt ? 'rgba(0,0,0,0.08)' : 'none',
+            fontWeight: value === opt ? 600 : 400,
+            font: 'inherit',
+            fontSize: '0.85em',
+            cursor: 'pointer',
+            textTransform: 'capitalize',
+          }}
+        >
+          {opt}
+        </button>
+      ))}
     </div>
   )
 }
