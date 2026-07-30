@@ -7,7 +7,9 @@
   "exports": {
     "./geometry.json": "./geometry.json",
     "./react": "./react/index.tsx",
-    "./assets/*": "./assets/*"
+    "./assets/*": "./assets/*",
+    "./customize": "./customize/index.tsx",
+    "./customize/protocol.js": "./customize/protocol.js"
   },
   "scripts": {
     "test": "node --test tests/",
