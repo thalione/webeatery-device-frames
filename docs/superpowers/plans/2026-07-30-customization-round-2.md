@@ -169,7 +169,16 @@ const emit = (nextName: string, nextColor: string, nextBrightness: string, nextS
 }
 ```
 
-(update the three existing `emit(...)` call sites to pass `brightness`/`style`; note `logoUrl` is NOT panel state — consumers merge it themselves.)
+The three existing call sites become (note `logoUrl` is NOT panel state — consumers merge it themselves):
+
+```tsx
+// name input onChange:
+onChange={(e) => { setName(e.target.value); emit(e.target.value, color, brightness, style) }}
+// swatch button onClick:
+onClick={() => { setColor(hex); emit(name, hex, brightness, style) }}
+// custom color well onChange:
+onChange={(e) => { setColor(e.target.value); emit(name, e.target.value, brightness, style) }}
+```
   4. Segmented row component (inside the file, below the panel):
 
 ```tsx
@@ -246,6 +255,10 @@ Branch setup (first TRS task): `git checkout main && git pull && git checkout -b
 - [ ] **Step 1: Write the failing tests** — extend `customize.test.ts` (existing vi-mock arrangement; `remount` spy passed via options):
 
 ```ts
+// Add to the suite's existing beforeEach (after the listener install):
+//   setShowcaseThemeMode('colorfullight')
+// — the mode is module state and must reset between tests.
+
 // New: theme + logo + consolidated remount
 it('theme fields map to a lowercase mode, stored + single remount', () => {
   post({ webeateryCustomize: 1, themeBrightness: 'dark', themeStyle: 'muted' })
@@ -340,9 +353,15 @@ type CustomizeMessage = {
 // isCustomizeMessage: add the three `!== undefined && typeof !== 'string' → false` checks.
 ```
 
-Rework the listener body (closure state per install: `lastAppliedHex`, `lastAppliedMode = showcaseThemeMode`, `brightness: 'light' | 'dark' = 'light'`, `style: 'colorful' | 'muted' = 'colorful'`; note `applyColor` loses its internal `remount?.()` call — remove it there — and returns `{ applied: boolean, lastApplied }` OR keep signature and compare returned value to detect change: `colorDirty = newLast !== prevLast`):
+Rework the listener body. `applyColor` keeps its `(hex, lastApplied)` signature but loses the `remount` param and its internal `remount?.()` call — change detection is `colorDirty = returned !== previous`. Closure state declared inside `installCustomizeListener`, above `onMessage`:
 
 ```ts
+  // Owned by this installed listener (round-1 pattern for lastAppliedHex).
+  let lastAppliedHex: string | null = null
+  let lastAppliedMode: ThemeMode = showcaseThemeMode
+  let brightness: 'light' | 'dark' = 'light'
+  let style: 'colorful' | 'muted' = 'colorful'
+
 const onMessage = (event: MessageEvent) => {
   if (event.origin !== embedderOrigin) return
   if (event.source !== win.parent) return
@@ -563,13 +582,17 @@ it("logo apply posts logoUrl and view-on-desktop switches tabs", async () => {
 });
 
 it("logo control is not rendered below md", () => {
-  window.matchMedia = mobileMatchMedia; // reuse the suite's existing mobile matchMedia helper pattern
+  // The suite's existing helper (defined in the "mobile browsers" describe,
+  // test file line ~187) — hoist `setViewportIsMobile` to file scope (it only
+  // touches the window.matchMedia jest mock) so this describe can use it too.
+  setViewportIsMobile(true);
   render(<DeviceSwitcher token="tok123" asset={asset} />);
   expect(screen.queryByTestId("logo-file-input")).not.toBeInTheDocument();
+  setViewportIsMobile(false);
 });
 ```
 
-(reuse the suite's existing mobile-viewport arrangement from the "mobile browsers" describe — copy its matchMedia setup rather than inventing `mobileMatchMedia` if the helper doesn't exist; move the cropImage/react-easy-crop jest.mocks to the top of the file so both suites share them.)
+(move the cropImage/react-easy-crop jest.mocks from `logo-upload.test.tsx` to the top of this file too so both suites share the same mock shapes.)
 
 - [ ] **Step 2: verify fail.**
 - [ ] **Step 3: implement** — in `DeviceSwitcher`: merge logo into the full-state ref so later panel emits don't drop it:
