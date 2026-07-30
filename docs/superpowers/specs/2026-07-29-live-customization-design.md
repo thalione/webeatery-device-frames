@@ -36,11 +36,15 @@ Adding future options (e.g. scheme toggles) = new optional fields on `CustomizeM
 
 ## 2. Showcase-side apply (`template_restaurant_react/apps/web`)
 
-New module `apps/web/src/showcase/customize.ts`, installed only in showcase mode, **before** `markShowcaseState('ready')` fires:
+New module `apps/web/src/showcase/customize.ts`, installed only in showcase mode. Call site: inside `bootShowcase`, after store seeding and **before** `markShowcaseState('ready')` — so a `ready` frame can never miss a message.
 
-- **Origin check:** accept messages only from the embedding page's origin, derived from `new URL(document.referrer).origin` — the same source of truth `markShowcaseState` uses for outbound posts. Shape-validate against `CustomizeMessage` (discriminator + field types). Silently ignore anything else.
+- **Embedder origin:** resolved once at install time from `document.referrer` — the same source of truth `markShowcaseState` uses for outbound posts. **If `document.referrer` is empty, do not install the listener at all** (`new URL('')` throws; boot.ts guards the same way at its line 28). Customization is then inert but the preview still works.
+- **Origin + source check:** accept a message only when `event.origin` equals the resolved embedder origin **and** `event.source === window.parent`. Shape-validate against `CustomizeMessage` (discriminator + field types). Silently ignore everything else.
+- Referrer-Policy note: default `strict-origin-when-cross-origin` still sends the origin cross-origin, so the referrer is reliably present in the real embed; the empty-referrer guard covers direct/worker loads.
 - **appName** → trim; if 1–40 chars: `useRestaurantStore` `setRestaurant({ ...restaurant, name })` (re-renders header/name everywhere) and `document.title = name`. Otherwise ignore the field.
-- **primaryColor** → validate `#RRGGBB`; rebuild the brand config through the existing chain. Refactor `brand.config.ts` to export `applyPrimaryColor(hex: string): void` that runs `generateBrandFromPrimaryColor` → `buildNewBrandConfig` → `setBrandConfig`, then regenerates and re-injects the `#brand-tokens` CSS variables (same injection path `initializeWebBrand` uses). CSS vars swap in place — no reload.
+- **primaryColor** → validate `#RRGGBB`, then two steps split by layer (neither `generateBrandFromPrimaryColor` nor `buildNewBrandConfig` is currently exported — `brand.config.ts:35,66`):
+  1. `packages/core` `brand.config.ts` exports new `applyPrimaryColor(hex: string): void` — runs `generateBrandFromPrimaryColor` → `transformRestaurantToBrandConfig`-equivalent config (preserving current `restaurantName`/`logoUrl`) → `buildNewBrandConfig` → `setBrandConfig` (both token systems). **`setBrandConfig` alone does not touch the DOM.**
+  2. `apps/web` — extract the `#brand-tokens` style-element injection from `initializeWebBrand` into an exported `injectBrandTokens(): void` (`generateCSSVariables()` + write to the style element); `customize.ts` calls `applyPrimaryColor(hex)` then `injectBrandTokens()`. CSS vars swap in place — no reload.
 - A message may carry one or both fields; each field is validated and applied independently (one bad field never blocks the other).
 - Boot behavior unchanged: forced red + payload name until a customize message arrives.
 
@@ -63,7 +67,7 @@ New module `apps/web/src/showcase/customize.ts`, installed only in showcase mode
 ## 5. Testing
 
 - **device-frames:** `node --test` units for message shape validation and `sendCustomize` (posts to all non-null frames, correct targetOrigin) — function-level, following the repo's existing test style.
-- **template_restaurant_react:** units for the listener alongside existing `showcase/*.test.ts`: rejects wrong origin, rejects bad shape, applies name (store + title), applies color (brand config set + `#brand-tokens` re-injected), applies independently when one field invalid.
+- **template_restaurant_react:** units for the listener alongside existing `showcase/*.test.ts`: rejects wrong origin, rejects wrong `event.source`, rejects bad shape, no-listener-when-referrer-empty, applies name (store + title), applies color (brand config set + `#brand-tokens` re-injected), applies independently when one field invalid.
 - **webeatery-website:** extend `__tests__/device-switcher.test.tsx`: panel renders, change posts to both iframes with `PREVIEW_ORIGIN`, resend-on-ready fires with full state.
 - **Mutation-test the guards** (per standing practice): break the origin check and the shape check, watch the corresponding tests fail, restore.
 
