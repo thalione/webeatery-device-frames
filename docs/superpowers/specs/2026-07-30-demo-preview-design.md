@@ -34,8 +34,12 @@ Hand-written, realistic menu copy (rename freely at implementation; owner may ov
 ## 3. Data plumbing (Supabase)
 
 - One `outreach_assets` row: `status='ready'`, permanent `preview_token`, `menu_json` = fixture, `images` array as usual (raw/render kinds optional — fallback images can be skipped for the demo since it should never fall back long-term; acceptable to include none and rely on the live frame), `logo_url` null (forced-red + name-nudge posture applies to the demo too, letting the customizer demo shine).
-- `lead_id`: if the column is non-nullable, create one house lead ("WebEatery Demo Restaurant", no email, house rep or none — pinned at plan time against the actual schema).
-- **Hard constraint — unreachable by all send paths:** the demo row/lead must be excluded from enrollment, dispatch, warmup, and stats. Mechanism pinned at plan time against the real dispatch/enrollment queries (candidates: no email + suppression row + a recognizable segment value excluded from send predicates). This is a blocking acceptance criterion, not best-effort.
+- `lead_id`: if the column is non-nullable, create one house lead ("WebEatery Demo Restaurant") — exact shape pinned at plan time against the schema.
+- **Hard constraint — unreachable by all send paths** (blocking acceptance criterion). Concrete mechanism (verified against the real queries in review):
+  1. **Demo lead status** set to a value the enrollment job never selects (`outreach_enroll.py:31-41` only enrolls leads in eligible statuses — spec review confirmed "no email + suppression + segment" alone would NOT stop enrollment from creating a fresh asset for an operating lead). Exact status value (`suppressed`/`closed`-class per the lead-status enum) pinned at plan time; the RPC/preview never reads lead status, so the demo page is unaffected.
+  2. **`outreach_assets.email` explicitly NULL** on the demo row — draft targeting (`outreach_draft.py:70-77`) builds email drafts from that field; NULL removes the demo from the email path by construction.
+  3. Belt-and-braces suppression row keyed to the house lead if it ever acquires an email.
+  - Acceptance test at plan time: run the enrollment + draft target selections (read-only) and assert the demo lead/asset appears in neither.
 - View tripwire noise: the website skips `firePreviewView` for the demo token (below); `view_count` on the row is therefore ~0 and stats stay clean.
 
 ## 4. Website entry (`webeatery-website`)
