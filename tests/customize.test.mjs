@@ -47,3 +47,35 @@ test('SWATCHES are 8 valid hexes', () => {
   assert.equal(SWATCHES.length, 8);
   for (const s of SWATCHES) assert.equal(isValidHex(s), true);
 });
+
+import {
+  isValidBrightness, isValidStyle, isValidLogoUrl, LOGO_MAX_LENGTH,
+} from '../customize/protocol.js';
+
+test('brightness/style validators are exact-string', () => {
+  assert.equal(isValidBrightness('light'), true);
+  assert.equal(isValidBrightness('dark'), true);
+  assert.equal(isValidBrightness('Dark'), false);
+  assert.equal(isValidBrightness(undefined), false);
+  assert.equal(isValidStyle('colorful'), true);
+  assert.equal(isValidStyle('muted'), true);
+  assert.equal(isValidStyle('mutedlight'), false);
+});
+
+test('logoUrl validator: data-image base64 only, capped', () => {
+  const png = 'data:image/png;base64,AAAA';
+  assert.equal(isValidLogoUrl(png), true);
+  assert.equal(isValidLogoUrl('data:image/webp;base64,AAAA'), true);
+  assert.equal(isValidLogoUrl('data:image/svg+xml;base64,AAAA'), false);
+  assert.equal(isValidLogoUrl('https://x/logo.png'), false);
+  assert.equal(isValidLogoUrl('data:image/png;base64,' + 'A'.repeat(LOGO_MAX_LENGTH)), false);
+  assert.equal(isValidLogoUrl(null), false);
+});
+
+test('buildCustomizeMessage carries new fields; theme-only message is NOT null', () => {
+  assert.deepEqual(buildCustomizeMessage({ themeBrightness: 'dark', themeStyle: 'muted' }),
+    { webeateryCustomize: 1, themeBrightness: 'dark', themeStyle: 'muted' });
+  assert.deepEqual(buildCustomizeMessage({ logoUrl: 'data:image/png;base64,AA' }),
+    { webeateryCustomize: 1, logoUrl: 'data:image/png;base64,AA' });
+  assert.equal(buildCustomizeMessage({ themeBrightness: 'DARK', logoUrl: 'nope' }), null);
+});

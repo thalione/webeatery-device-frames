@@ -11,15 +11,29 @@ export function normalizeAppName(raw: unknown): string | null;
 
 export function isValidHex(hex: unknown): boolean;
 
+export function isValidBrightness(v: unknown): boolean;
+
+export function isValidStyle(v: unknown): boolean;
+
+export const LOGO_MAX_LENGTH: number;
+
+export function isValidLogoUrl(v: unknown): boolean;
+
 export type CustomizeMessagePayload = {
   webeateryCustomize: 1;
   appName?: string;
   primaryColor?: string;
+  themeBrightness?: 'light' | 'dark';
+  themeStyle?: 'colorful' | 'muted';
+  logoUrl?: string;
 };
 
 export function buildCustomizeMessage(fields?: {
   appName?: unknown;
   primaryColor?: unknown;
+  themeBrightness?: unknown;
+  themeStyle?: unknown;
+  logoUrl?: unknown;
 }): CustomizeMessagePayload | null;
 
 export function sendCustomize(
