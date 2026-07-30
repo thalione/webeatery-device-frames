@@ -166,29 +166,29 @@ Branch: `git checkout main && git pull && git checkout -b demo-preview-seed` in 
 
 **Seed script behavior** (`seed-demo-asset.mjs`, plain Node ESM, no new deps — use global `fetch` like existing tooling):
 1. Load fixture; zod-less sanity checks (every `customizations[].id` unique + uuid-regex, every option price ≥ 0, photo placeholders resolve to manifest entries).
-2. Find-or-create house lead: `leads` row `name='WebEatery Demo Restaurant'`, `suppressed=true, suppressed_reason='existing_merchant'`, no email; idempotent by name lookup.
-3. Find-or-create `outreach_assets` row keyed by `lead_id` (UNIQUE): `status='ready'`, `email=null`, `menu_json` = fixture items with rewritten photo URLs, `brand_colors=null`, `logo_url=null`, `images=[]`. Token: generate 192-bit on first insert; NEVER rotate on re-run (update must not touch `preview_token`).
+2. Find-or-create house lead: `leads` row **`name='The Golden Fork'`** (the RPC serves the LEAD's name/address as the preview's display name — `011_preview_address.sql:27`; a "WebEatery Demo Restaurant" lead name would leak into the page header), `address='412 Orchard Lane, Napa, CA 94559'` if leads carries address fields the RPC reads, `suppressed=true, suppressed_reason='existing_merchant'`, no email; idempotent by name lookup.
+3. Find-or-create `outreach_assets` row keyed by `lead_id` (UNIQUE): `status='ready'`, `email=null`, **`segment` from `fixture.restaurant.segment` ('no_ordering')** — the RPC returns segment and it drives the page's CTA copy, `menu_json` = fixture items with rewritten photo URLs, `brand_colors=null`, `logo_url=null`, `images=[]`. Supply any other NOT-NULL-without-default columns discovered from the live schema at write time (print them in the dry-run plan). Token: generate 192-bit on first insert; NEVER rotate on re-run (update must not touch `preview_token`).
 4. Images: for each manifest entry, download source → upload to `outreach-renders/${assetId}/${file}` via the existing storage endpoint pattern (`outreach/outreach-store.mjs:91` layout); skip-if-exists.
 5. Dry run (default): print the would-be lead/asset payloads + image plan, ZERO writes. `--apply`: execute, then print the resulting preview token + URL.
 6. **Send-path acceptance check** (runs in BOTH modes, read-only): re-implement the `select_outreach_targets` predicate client-side (suppressed/pre_open/closed filter per `outreach_enroll.py:31-41`) against the demo lead row and assert it's excluded; query outreach draft targeting shape (`email is null`) and assert no email path. Exit non-zero if either fails.
 
-- [ ] **Step 1: failing tests** — `tests/outreach/demo-fixture.test.mjs` (node --test, matches repo's existing tests):
+- [ ] **Step 1: failing tests** — `tests/outreach/demo-fixture.test.mjs` (**vitest** — the repo's `test` script is `vitest run` and existing `tests/outreach/*.test.mjs` import from `'vitest'`; run this file with `npx vitest run tests/outreach/demo-fixture.test.mjs`). node:assert works fine inside vitest `it` blocks — keep the assertions as written:
 
 ```js
-import test from 'node:test';
+import { it } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 const fixture = JSON.parse(fs.readFileSync(new URL('../../outreach/demo/golden-fork.json', import.meta.url)));
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-test('fixture shape: 5 categories, 22 items, name+segment set', () => {
+it('fixture shape: 5 categories, 22 items, name+segment set', () => {
   assert.equal(fixture.restaurant.name, 'The Golden Fork');
   const cats = new Set(fixture.menu.map((i) => i.category));
   assert.equal(cats.size, 5);
   assert.equal(fixture.menu.length, 22);
 });
 
-test('all customization + option ids are unique uuids, prices nonnegative', () => {
+it('all customization + option ids are unique uuids, prices nonnegative', () => {
   const ids = [];
   for (const item of fixture.menu) {
     for (const c of item.customizations ?? []) {
@@ -201,7 +201,7 @@ test('all customization + option ids are unique uuids, prices nonnegative', () =
   assert.equal(new Set(ids).size, ids.length);
 });
 
-test('required groups have a default and min/max 1', () => {
+it('required groups have a default and min/max 1', () => {
   for (const item of fixture.menu) {
     for (const c of item.customizations ?? []) {
       if (!c.isRequired) continue;
@@ -212,7 +212,7 @@ test('required groups have a default and min/max 1', () => {
   }
 });
 
-test('every photo placeholder resolves to a manifest entry', () => {
+it('every photo placeholder resolves to a manifest entry', () => {
   const files = new Set(fixture.images.map((i) => i.file));
   for (const item of fixture.menu) {
     if (!item.photo_url) continue;
@@ -221,7 +221,7 @@ test('every photo placeholder resolves to a manifest entry', () => {
   }
 });
 
-test('option-group coverage matches the plan matrix', () => {
+it('option-group coverage matches the plan matrix', () => {
   const byCat = (cat) => fixture.menu.filter((i) => i.category === cat);
   for (const p of byCat('Wood-Fired Pizzas')) {
     const names = (p.customizations ?? []).map((c) => c.name);
@@ -233,11 +233,11 @@ test('option-group coverage matches the plan matrix', () => {
 });
 ```
 
-- [ ] **Step 2: verify fail** (fixture absent) — `node --test tests/outreach/demo-fixture.test.mjs`.
+- [ ] **Step 2: verify fail** (fixture absent) — `npx vitest run tests/outreach/demo-fixture.test.mjs`.
 - [ ] **Step 3: author fixture** per requirements (write all 22 items; verify every manifest URL with `curl -fsSI` as specified).
 - [ ] **Step 4: tests pass.**
 - [ ] **Step 5: write seed script** per behavior spec above. Include `--help`. No unit test for the network paths; the dry-run IS the test surface — run `node outreach/demo/seed-demo-asset.mjs` (dry) and eyeball the printed plan; the send-path acceptance check must PASS against… nothing yet (lead doesn't exist) — it must handle "lead not yet created" by validating the WOULD-BE row it prints.
-- [ ] **Step 6: full repo test run** — `node --test tests/` (existing outreach/compositor tests stay green).
+- [ ] **Step 6: full repo test run** — `npx vitest run tests/` (existing outreach/compositor tests stay green).
 - [ ] **Step 7: commit + push** — `feat(outreach): Golden Fork demo fixture + idempotent seed script (dry-run default)`.
 
 ---
