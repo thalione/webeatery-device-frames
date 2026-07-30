@@ -7,7 +7,7 @@
 // geometry, the color-well's swatch pseudo-elements — things every consumer
 // would otherwise have to rebuild); theme (card surface, fonts, colors of
 // the surrounding chrome) stays with the consumer via className.
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   CUSTOMIZE_VERSION,
   SWATCHES,
@@ -59,6 +59,7 @@ export function CustomizePanel({
   initialStyle,
   onChange,
   className,
+  appIconSlot,
 }: {
   initialName?: string
   initialColor?: string
@@ -66,6 +67,11 @@ export function CustomizePanel({
   initialStyle?: 'colorful' | 'muted'
   onChange: (msg: CustomizeMessage) => void
   className?: string
+  /** Consumer-supplied app-icon control (e.g. an upload trigger), rendered
+   * as the third column of the Theme/Style row under an "App icon" label.
+   * Omit to hide the column (e.g. on mobile, where there's no desktop frame
+   * to show an icon in). */
+  appIconSlot?: ReactNode
 }) {
   const [name, setName] = useState(initialName ?? '')
   const [color, setColor] = useState(initialColor ?? SWATCHES[0])
@@ -93,9 +99,7 @@ export function CustomizePanel({
     <div className={className} data-testid="customize-panel">
       <style>{PANEL_CSS}</style>
       <label style={{ display: 'block' }}>
-        <span style={{ display: 'block', fontSize: '0.8em', fontWeight: 500, opacity: 0.7, marginBottom: 6 }}>
-          App name
-        </span>
+        <FieldLabel>App name</FieldLabel>
         <input
           type="text"
           value={name}
@@ -117,10 +121,13 @@ export function CustomizePanel({
           }}
         />
       </label>
+      <div style={{ marginTop: 12 }}>
+        <FieldLabel>Color scheme</FieldLabel>
+      </div>
       <div
         role="group"
-        aria-label="Primary color"
-        style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', marginTop: 10 }}
+        aria-label="Color scheme"
+        style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center' }}
       >
         {SWATCHES.map((hex: string) => (
           <button
@@ -165,15 +172,34 @@ export function CustomizePanel({
           data-testid="customize-color"
         />
       </div>
-      <SegmentedRow label="Theme" options={['light', 'dark'] as const} value={brightness}
-        onSelect={(v) => { setBrightness(v as 'light' | 'dark'); emit(name, color, v, style) }} />
-      <SegmentedRow label="Style" options={['colorful', 'muted'] as const} value={style}
-        onSelect={(v) => { setStyle(v as 'colorful' | 'muted'); emit(name, color, brightness, v) }} />
+      {/* Theme | Style | App icon share one row; the two segmented groups
+          get equal flex so all four buttons end up the same size. */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: 16, marginTop: 12 }}>
+        <SegmentedGroup label="Theme" options={['light', 'dark'] as const} value={brightness}
+          onSelect={(v) => { setBrightness(v as 'light' | 'dark'); emit(name, color, v, style) }} />
+        <SegmentedGroup label="Style" options={['colorful', 'muted'] as const} value={style}
+          onSelect={(v) => { setStyle(v as 'colorful' | 'muted'); emit(name, color, brightness, v) }} />
+        {appIconSlot != null && (
+          <div style={{ flexShrink: 0 }}>
+            <FieldLabel>App icon</FieldLabel>
+            {appIconSlot}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
 
-function SegmentedRow({
+/** Shared section label — same treatment above every control group. */
+function FieldLabel({ children }: { children: ReactNode }) {
+  return (
+    <span style={{ display: 'block', fontSize: '0.8em', fontWeight: 500, opacity: 0.7, marginBottom: 6 }}>
+      {children}
+    </span>
+  )
+}
+
+function SegmentedGroup({
   label,
   options,
   value,
@@ -185,32 +211,37 @@ function SegmentedRow({
   onSelect: (v: string) => void
 }) {
   return (
-    <div role="radiogroup" aria-label={label} style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
-      <span style={{ fontSize: '0.8em', fontWeight: 500, opacity: 0.7, minWidth: 64 }}>{label}</span>
-      {options.map((opt) => (
-        <button
-          key={opt}
-          type="button"
-          role="radio"
-          aria-checked={value === opt}
-          className="wdf-swatch"
-          onClick={() => onSelect(opt)}
-          style={{
-            minHeight: 40,
-            padding: '6px 14px',
-            borderRadius: 999,
-            border: '1px solid rgba(0,0,0,0.15)',
-            background: value === opt ? 'rgba(0,0,0,0.08)' : 'none',
-            fontWeight: value === opt ? 600 : 400,
-            font: 'inherit',
-            fontSize: '0.85em',
-            cursor: 'pointer',
-            textTransform: 'capitalize',
-          }}
-        >
-          {opt}
-        </button>
-      ))}
+    <div style={{ flex: 1, minWidth: 150 }}>
+      <FieldLabel>{label}</FieldLabel>
+      <div role="radiogroup" aria-label={label} style={{ display: 'flex', gap: 8 }}>
+        {options.map((opt) => (
+          <button
+            key={opt}
+            type="button"
+            role="radio"
+            aria-checked={value === opt}
+            className="wdf-swatch"
+            onClick={() => onSelect(opt)}
+            style={{
+              // flex:1 inside equal-width groups → all four Theme/Style
+              // buttons render the same size regardless of label length.
+              flex: 1,
+              minHeight: 40,
+              padding: '6px 10px',
+              borderRadius: 999,
+              border: '1px solid rgba(0,0,0,0.15)',
+              background: value === opt ? 'rgba(0,0,0,0.08)' : 'none',
+              fontWeight: value === opt ? 600 : 400,
+              fontFamily: 'inherit',
+              fontSize: '0.85em',
+              cursor: 'pointer',
+              textTransform: 'capitalize',
+            }}
+          >
+            {opt}
+          </button>
+        ))}
+      </div>
     </div>
   )
 }
