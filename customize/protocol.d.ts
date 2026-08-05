@@ -19,6 +19,25 @@ export const LOGO_MAX_LENGTH: number;
 
 export function isValidLogoUrl(v: unknown): boolean;
 
+export type IconBrand = 'phosphor';
+
+export type IconStyleName =
+  | 'thin'
+  | 'regular'
+  | 'bold'
+  | 'thinDuo'
+  | 'regularDuo'
+  | 'boldDuo'
+  | 'fill';
+
+export const ICON_BRANDS: readonly IconBrand[];
+
+export const ICON_STYLES: readonly IconStyleName[];
+
+export function isValidIconBrand(v: unknown): boolean;
+
+export function isValidIconStyle(v: unknown): boolean;
+
 export type CustomizeMessagePayload = {
   webeateryCustomize: 1;
   appName?: string;
@@ -26,6 +45,8 @@ export type CustomizeMessagePayload = {
   themeBrightness?: 'light' | 'dark';
   themeStyle?: 'colorful' | 'muted';
   logoUrl?: string;
+  iconBrand?: IconBrand;
+  iconStyle?: IconStyleName;
 };
 
 export function buildCustomizeMessage(fields?: {
@@ -34,6 +55,8 @@ export function buildCustomizeMessage(fields?: {
   themeBrightness?: unknown;
   themeStyle?: unknown;
   logoUrl?: unknown;
+  iconBrand?: unknown;
+  iconStyle?: unknown;
 }): CustomizeMessagePayload | null;
 
 export function sendCustomize(

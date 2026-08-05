@@ -19,6 +19,12 @@ import {
   isValidStyle,
   isValidLogoUrl,
   LOGO_MAX_LENGTH,
+  ICON_BRANDS,
+  ICON_STYLES,
+  isValidIconBrand,
+  isValidIconStyle,
+  type IconBrand,
+  type IconStyleName,
 } from './protocol.js'
 
 export type CustomizeMessage = {
@@ -28,11 +34,29 @@ export type CustomizeMessage = {
   themeBrightness?: 'light' | 'dark'
   themeStyle?: 'colorful' | 'muted'
   logoUrl?: string
+  iconBrand?: IconBrand
+  iconStyle?: IconStyleName
 }
 
-export { CUSTOMIZE_VERSION, SWATCHES, buildCustomizeMessage, isValidHex, normalizeAppName, sendCustomize, isValidBrightness, isValidStyle, isValidLogoUrl, LOGO_MAX_LENGTH }
+export { CUSTOMIZE_VERSION, SWATCHES, buildCustomizeMessage, isValidHex, normalizeAppName, sendCustomize, isValidBrightness, isValidStyle, isValidLogoUrl, LOGO_MAX_LENGTH, ICON_BRANDS, ICON_STYLES, isValidIconBrand, isValidIconStyle }
+export type { IconBrand, IconStyleName }
 
 const DEBOUNCE_MS = 150
+
+// Matches the app's own icon-style selector so the vocabulary stays consistent
+// across surfaces (ICON_STYLE_LABELS in its ComponentShowcase page).
+const ICON_STYLE_LABELS: Record<string, string> = {
+  thin: 'Thin',
+  regular: 'Regular',
+  bold: 'Bold',
+  thinDuo: 'Thin Duo',
+  regularDuo: 'Regular Duo',
+  boldDuo: 'Bold Duo',
+  fill: 'Fill',
+}
+
+// The panel drives one icon family today; the protocol accepts more.
+const PANEL_ICON_BRAND: IconBrand = 'phosphor'
 
 // Swatch geometry: 40×40 hit area (minimum comfortable touch target) with a
 // 24px visible dot centered inside. Selection ring is concentric — 2px gap
@@ -57,6 +81,7 @@ export function CustomizePanel({
   initialColor,
   initialBrightness,
   initialStyle,
+  initialIconStyle,
   onChange,
   className,
   appIconSlot,
@@ -65,6 +90,9 @@ export function CustomizePanel({
   initialColor?: string
   initialBrightness?: 'light' | 'dark'
   initialStyle?: 'colorful' | 'muted'
+  /** Defaults to 'fill' — the style the showcase itself boots on, so the
+   * panel's first emit doesn't silently restyle a preview already on screen. */
+  initialIconStyle?: IconStyleName
   onChange: (msg: CustomizeMessage) => void
   className?: string
   /** Consumer-supplied app-icon control (e.g. an upload trigger), rendered
@@ -77,12 +105,16 @@ export function CustomizePanel({
   const [color, setColor] = useState(initialColor ?? SWATCHES[0])
   const [brightness, setBrightness] = useState(initialBrightness ?? 'light')
   const [style, setStyle] = useState(initialStyle ?? 'colorful')
+  const [iconStyle, setIconStyle] = useState<string>(initialIconStyle ?? 'fill')
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current) }, [])
 
-  // Full-state emit: every change re-sends name, color, brightness, and style
-  // so a consumer can treat the latest message as the whole customization state.
-  const emit = (nextName: string, nextColor: string, nextBrightness: string, nextStyle: string) => {
+  // Full-state emit: every change re-sends name, color, brightness, style and
+  // icon style so a consumer can treat the latest message as the whole
+  // customization state. Re-sending an unchanged icon style costs nothing —
+  // the showcase early-returns on an unchanged style id, and icons subscribe
+  // to its store rather than remounting.
+  const emit = (nextName: string, nextColor: string, nextBrightness: string, nextStyle: string, nextIconStyle: string) => {
     if (timer.current) clearTimeout(timer.current)
     timer.current = setTimeout(() => {
       const msg = buildCustomizeMessage({
@@ -90,6 +122,8 @@ export function CustomizePanel({
         primaryColor: nextColor,
         themeBrightness: nextBrightness,
         themeStyle: nextStyle,
+        iconBrand: PANEL_ICON_BRAND,
+        iconStyle: nextIconStyle,
       })
       if (msg) onChange(msg as CustomizeMessage)
     }, DEBOUNCE_MS)
@@ -105,7 +139,7 @@ export function CustomizePanel({
           value={name}
           maxLength={40}
           placeholder="Your restaurant's name"
-          onChange={(e) => { setName(e.target.value); emit(e.target.value, color, brightness, style) }}
+          onChange={(e) => { setName(e.target.value); emit(e.target.value, color, brightness, style, iconStyle) }}
           data-testid="customize-name"
           className="wdf-name"
           style={{
@@ -147,7 +181,7 @@ export function CustomizePanel({
               alignItems: 'center',
               justifyContent: 'center',
             }}
-            onClick={() => { setColor(hex); emit(name, hex, brightness, style) }}
+            onClick={() => { setColor(hex); emit(name, hex, brightness, style, iconStyle) }}
           >
             <span
               aria-hidden
@@ -168,7 +202,7 @@ export function CustomizePanel({
           value={isValidHex(color) ? color : '#FF0000'}
           aria-label="Custom color"
           className="wdf-colorwell"
-          onChange={(e) => { setColor(e.target.value); emit(name, e.target.value, brightness, style) }}
+          onChange={(e) => { setColor(e.target.value); emit(name, e.target.value, brightness, style, iconStyle) }}
           data-testid="customize-color"
         />
       </div>
@@ -178,9 +212,9 @@ export function CustomizePanel({
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: 16, marginTop: 12 }}>
         <div style={{ flex: 1, minWidth: 150, display: 'flex', flexDirection: 'column', gap: 12 }}>
           <SegmentedGroup label="Theme" options={['light', 'dark'] as const} value={brightness}
-            onSelect={(v) => { setBrightness(v as 'light' | 'dark'); emit(name, color, v, style) }} />
+            onSelect={(v) => { setBrightness(v as 'light' | 'dark'); emit(name, color, v, style, iconStyle) }} />
           <SegmentedGroup label="Style" options={['colorful', 'muted'] as const} value={style}
-            onSelect={(v) => { setStyle(v as 'colorful' | 'muted'); emit(name, color, brightness, v) }} />
+            onSelect={(v) => { setStyle(v as 'colorful' | 'muted'); emit(name, color, brightness, v, iconStyle) }} />
         </div>
         {appIconSlot != null && (
           <div style={{ flexShrink: 0 }}>
@@ -188,6 +222,13 @@ export function CustomizePanel({
             {appIconSlot}
           </div>
         )}
+      </div>
+      {/* Full-width row of its own: seven pills need to wrap, which they can't
+          do inside the two-column Theme/Style/App icon block above. */}
+      <div style={{ marginTop: 12 }}>
+        <SegmentedGroup label="Icon style" options={ICON_STYLES} value={iconStyle} wrap
+          labels={ICON_STYLE_LABELS}
+          onSelect={(v) => { setIconStyle(v); emit(name, color, brightness, style, v) }} />
       </div>
     </div>
   )
@@ -207,16 +248,23 @@ function SegmentedGroup({
   options,
   value,
   onSelect,
+  labels,
+  wrap = false,
 }: {
   label: string
-  options: readonly [string, string]
+  options: readonly string[]
   value: string
   onSelect: (v: string) => void
+  /** Display text per option; the option value itself is used when absent. */
+  labels?: Record<string, string>
+  /** Let the row wrap and size buttons to their content — for groups with more
+   * options than fit on one line (the icon-style row). */
+  wrap?: boolean
 }) {
   return (
     <div>
       <FieldLabel>{label}</FieldLabel>
-      <div role="radiogroup" aria-label={label} style={{ display: 'flex', gap: 8 }}>
+      <div role="radiogroup" aria-label={label} style={{ display: 'flex', gap: 8, flexWrap: wrap ? 'wrap' : 'nowrap' }}>
         {options.map((opt) => (
           <button
             key={opt}
@@ -228,7 +276,9 @@ function SegmentedGroup({
             style={{
               // flex:1 inside equal-width groups → all four Theme/Style
               // buttons render the same size regardless of label length.
-              flex: 1,
+              // A wrapping row sizes to content instead, or the last line
+              // stretches its one or two pills across the full width.
+              flex: wrap ? '0 0 auto' : 1,
               minHeight: 40,
               padding: '6px 10px',
               borderRadius: 999,
@@ -241,7 +291,7 @@ function SegmentedGroup({
               textTransform: 'capitalize',
             }}
           >
-            {opt}
+            {labels?.[opt] ?? opt}
           </button>
         ))}
       </div>
