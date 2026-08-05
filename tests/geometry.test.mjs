@@ -26,6 +26,11 @@ for (const [name, g] of Object.entries(geometry)) {
     assert.ok(y + height <= g.frameSize.height);
   });
 
+  test(`${name}: cornerRadius fits inside the screen region`, () => {
+    assert.ok(g.cornerRadius > 0);
+    assert.ok(g.cornerRadius * 2 <= Math.min(g.screenRegion.width, g.screenRegion.height));
+  });
+
   test(`${name}: renderViewport aspect matches screenRegion aspect`, () => {
     const va = g.renderViewport.width / g.renderViewport.height;
     const sa = g.screenRegion.width / g.screenRegion.height;
