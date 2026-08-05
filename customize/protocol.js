@@ -33,8 +33,24 @@ export function isValidLogoUrl(v) {
     && /^data:image\/(png|jpeg|webp);base64,/.test(v);
 }
 
+// The wire carries the human-facing pair (brand + style name), not the
+// showcase's resolved registry id (`phosThin`) — so a second icon family later
+// is a value change, not a protocol change. Hardcoded rather than imported:
+// this package must stay dependency-free of the app, and the showcase
+// re-validates against its own copy of these lists anyway.
+export const ICON_BRANDS = ['phosphor'];
+export const ICON_STYLES = ['thin', 'regular', 'bold', 'thinDuo', 'regularDuo', 'boldDuo', 'fill'];
+
+export function isValidIconBrand(v) {
+  return ICON_BRANDS.includes(v);
+}
+
+export function isValidIconStyle(v) {
+  return ICON_STYLES.includes(v);
+}
+
 /** Build a versioned message carrying only the valid fields; null if none. */
-export function buildCustomizeMessage({ appName, primaryColor, themeBrightness, themeStyle, logoUrl } = {}) {
+export function buildCustomizeMessage({ appName, primaryColor, themeBrightness, themeStyle, logoUrl, iconBrand, iconStyle } = {}) {
   const msg = { webeateryCustomize: CUSTOMIZE_VERSION };
   const name = normalizeAppName(appName);
   if (name) msg.appName = name;
@@ -42,11 +58,12 @@ export function buildCustomizeMessage({ appName, primaryColor, themeBrightness, 
   if (isValidBrightness(themeBrightness)) msg.themeBrightness = themeBrightness;
   if (isValidStyle(themeStyle)) msg.themeStyle = themeStyle;
   if (isValidLogoUrl(logoUrl)) msg.logoUrl = logoUrl;
-  // Null iff NO field is valid — must check all five (a theme-only or
-  // logo-only message is a real message).
-  return msg.appName || msg.primaryColor || msg.themeBrightness || msg.themeStyle || msg.logoUrl
-    ? msg
-    : null;
+  if (isValidIconBrand(iconBrand)) msg.iconBrand = iconBrand;
+  if (isValidIconStyle(iconStyle)) msg.iconStyle = iconStyle;
+  // Null iff NO field is valid. Key count rather than an OR chain over every
+  // field, so a new field is covered automatically instead of silently making
+  // theme-only / logo-only / icon-only messages return null.
+  return Object.keys(msg).length > 1 ? msg : null;
 }
 
 /** Post msg to every live iframe. targetOrigin is REQUIRED — never '*'. */

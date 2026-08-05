@@ -79,3 +79,52 @@ test('buildCustomizeMessage carries new fields; theme-only message is NOT null',
     { webeateryCustomize: 1, logoUrl: 'data:image/png;base64,AA' });
   assert.equal(buildCustomizeMessage({ themeBrightness: 'DARK', logoUrl: 'nope' }), null);
 });
+
+import {
+  ICON_BRANDS, ICON_STYLES, isValidIconBrand, isValidIconStyle,
+} from '../customize/protocol.js';
+
+test('icon allowlists: 7 distinct styles, one brand', () => {
+  assert.equal(ICON_STYLES.length, 7);
+  assert.equal(new Set(ICON_STYLES).size, 7);
+  assert.deepEqual(ICON_BRANDS, ['phosphor']);
+});
+
+test('isValidIconBrand is exact-string', () => {
+  assert.equal(isValidIconBrand('phosphor'), true);
+  assert.equal(isValidIconBrand('Phosphor'), false);
+  assert.equal(isValidIconBrand(''), false);
+  assert.equal(isValidIconBrand(undefined), false);
+  assert.equal(isValidIconBrand(null), false);
+  assert.equal(isValidIconBrand(42), false);
+});
+
+test('isValidIconStyle accepts the 7 names, not resolved registry ids', () => {
+  for (const s of ICON_STYLES) assert.equal(isValidIconStyle(s), true);
+  // The wire carries the style NAME; 'phosThin'/'phosFill' are the showcase's
+  // internal ids and must never be accepted here.
+  assert.equal(isValidIconStyle('phosFill'), false);
+  assert.equal(isValidIconStyle('phosThin'), false);
+  assert.equal(isValidIconStyle('Fill'), false);
+  assert.equal(isValidIconStyle('duo'), false);
+  assert.equal(isValidIconStyle(''), false);
+  assert.equal(isValidIconStyle(null), false);
+});
+
+test('buildCustomizeMessage carries icon fields; icon-only message is NOT null', () => {
+  assert.deepEqual(buildCustomizeMessage({ iconBrand: 'phosphor', iconStyle: 'boldDuo' }),
+    { webeateryCustomize: 1, iconBrand: 'phosphor', iconStyle: 'boldDuo' });
+  // Both are sticky axes on the showcase side, so either alone is meaningful.
+  assert.deepEqual(buildCustomizeMessage({ iconStyle: 'thin' }),
+    { webeateryCustomize: 1, iconStyle: 'thin' });
+  assert.deepEqual(buildCustomizeMessage({ iconBrand: 'phosphor' }),
+    { webeateryCustomize: 1, iconBrand: 'phosphor' });
+});
+
+test('buildCustomizeMessage drops invalid icon fields without dropping the message', () => {
+  assert.deepEqual(buildCustomizeMessage({ primaryColor: '#112233', iconStyle: 'phosFill' }),
+    { webeateryCustomize: 1, primaryColor: '#112233' });
+  assert.deepEqual(buildCustomizeMessage({ iconBrand: 'lucide', iconStyle: 'bold' }),
+    { webeateryCustomize: 1, iconStyle: 'bold' });
+  assert.equal(buildCustomizeMessage({ iconBrand: 'lucide', iconStyle: 'Bold' }), null);
+});
