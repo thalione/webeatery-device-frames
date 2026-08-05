@@ -12,7 +12,7 @@
     "./customize/protocol.js": "./customize/protocol.js"
   },
   "scripts": {
-    "test": "node --test tests/",
+    "test": "node --test",
     "generate": "node scripts/generate-browser-frame.mjs"
   },
   "peerDependencies": {
