@@ -43,8 +43,13 @@ test('sendCustomize survives a frame with no contentWindow', () => {
   assert.doesNotThrow(() => sendCustomize([{ contentWindow: null }], { webeateryCustomize: 1, appName: 'A' }, 'https://p.example'));
 });
 
-test('SWATCHES are 8 valid hexes', () => {
-  assert.equal(SWATCHES.length, 8);
+test('SWATCHES are the 9 Figma presets in grid order', () => {
+  // Exact order matters: the panel renders these left-to-right, top-to-bottom
+  // in its 5×2 grid, and SWATCHES[0] is the panel's default color.
+  assert.deepEqual(SWATCHES, [
+    '#FF0000', '#E4572E', '#F4B400', '#43A047', '#00897B',
+    '#1E88E5', '#8E24AA', '#D81B60', '#5D4037',
+  ]);
   for (const s of SWATCHES) assert.equal(isValidHex(s), true);
 });
 
@@ -127,4 +132,46 @@ test('buildCustomizeMessage drops invalid icon fields without dropping the messa
   assert.deepEqual(buildCustomizeMessage({ iconBrand: 'lucide', iconStyle: 'bold' }),
     { webeateryCustomize: 1, iconStyle: 'bold' });
   assert.equal(buildCustomizeMessage({ iconBrand: 'lucide', iconStyle: 'Bold' }), null);
+});
+
+import {
+  DETAILS_FIELDS, RANDOM_OPTION_SETS, randomizeCustomization,
+} from '../customize/protocol.js';
+
+test('randomizeCustomization is deterministic under a stubbed source', () => {
+  assert.deepEqual(randomizeCustomization(() => 0), {
+    primaryColor: '#FF0000', themeBrightness: 'light', themeStyle: 'colorful',
+    iconBrand: 'phosphor', iconStyle: 'thin',
+  });
+  assert.deepEqual(randomizeCustomization(() => 0.9999), {
+    primaryColor: '#5D4037', themeBrightness: 'dark', themeStyle: 'muted',
+    iconBrand: 'phosphor', iconStyle: 'fill',
+  });
+});
+
+test('randomizeCustomization never touches Details fields', () => {
+  for (const r of [0, 0.25, 0.5, 0.75, 0.9999]) {
+    const result = randomizeCustomization(() => r);
+    for (const field of DETAILS_FIELDS) assert.equal(field in result, false);
+  }
+});
+
+test('every optional wire field is classified as randomizable or Details', () => {
+  // Forces whoever adds wire field #8 to decide: randomized by default
+  // (RANDOM_OPTION_SETS) or a Details-tab exception (DETAILS_FIELDS).
+  const optionalWireFields = [
+    'appName', 'primaryColor', 'themeBrightness', 'themeStyle',
+    'logoUrl', 'iconBrand', 'iconStyle',
+  ];
+  const classified = [...Object.keys(RANDOM_OPTION_SETS), ...DETAILS_FIELDS].sort();
+  assert.deepEqual(classified, [...optionalWireFields].sort());
+});
+
+test('randomized output survives buildCustomizeMessage intact', () => {
+  for (const r of [0, 0.5, 0.9999]) {
+    const picks = randomizeCustomization(() => r);
+    const msg = buildCustomizeMessage(picks);
+    assert.notEqual(msg, null);
+    for (const [field, value] of Object.entries(picks)) assert.equal(msg[field], value);
+  }
 });

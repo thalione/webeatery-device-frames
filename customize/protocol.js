@@ -2,9 +2,11 @@
 // TSX) so node --test can import it directly; customize/index.tsx re-exports.
 export const CUSTOMIZE_VERSION = 1;
 
+// Figma order — reads left-to-right, top-to-bottom in the panel's 5×2 grid;
+// the grid's 10th cell is the custom color picker, not a swatch.
 export const SWATCHES = [
-  '#E4572E', '#1E88E5', '#43A047', '#8E24AA',
-  '#F4B400', '#00897B', '#D81B60', '#5D4037',
+  '#FF0000', '#E4572E', '#F4B400', '#43A047', '#00897B',
+  '#1E88E5', '#8E24AA', '#D81B60', '#5D4037',
 ];
 
 export function normalizeAppName(raw) {
@@ -47,6 +49,28 @@ export function isValidIconBrand(v) {
 
 export function isValidIconStyle(v) {
   return ICON_STYLES.includes(v);
+}
+
+// Details-tab fields: NEVER randomized. Every other wire field with a finite
+// option set goes in RANDOM_OPTION_SETS — new fields are randomized by
+// default; list them here to exempt them.
+export const DETAILS_FIELDS = ['appName', 'logoUrl'];
+
+export const RANDOM_OPTION_SETS = {
+  primaryColor: SWATCHES,
+  themeBrightness: ['light', 'dark'],
+  themeStyle: ['colorful', 'muted'],
+  iconBrand: ICON_BRANDS,
+  iconStyle: ICON_STYLES,
+};
+
+/** Pure: pass a random source (0 ≤ r < 1) for deterministic tests. */
+export function randomizeCustomization(random = Math.random) {
+  const out = {};
+  for (const [field, options] of Object.entries(RANDOM_OPTION_SETS)) {
+    out[field] = options[Math.floor(random() * options.length)];
+  }
+  return out;
 }
 
 /** Build a versioned message carrying only the valid fields; null if none. */
