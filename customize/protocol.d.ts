@@ -49,6 +49,18 @@ export type CustomizeMessagePayload = {
   iconStyle?: IconStyleName;
 };
 
+export const DETAILS_FIELDS: readonly string[];
+
+export const RANDOM_OPTION_SETS: Record<string, readonly string[]>;
+
+export function randomizeCustomization(random?: () => number): {
+  primaryColor: string;
+  themeBrightness: 'light' | 'dark';
+  themeStyle: 'colorful' | 'muted';
+  iconBrand: IconBrand;
+  iconStyle: IconStyleName;
+};
+
 export function buildCustomizeMessage(fields?: {
   appName?: unknown;
   primaryColor?: unknown;
